@@ -3,11 +3,12 @@
  */
 
 // load locally embedded contexts
-//@ts-expect-error
+//@ts-ignore
 import { contexts as credentialsContexts } from '@digitalbazaar/credentials-context'
+//@ts-ignore
+import { extendContextLoader } from 'jsonld-signatures'
 
 const contexts = new Map([...credentialsContexts])
-
 
 export type DocumentLoader = (url: string) => DocumentContext
 export type DocumentContext<T = any> = {
@@ -26,3 +27,5 @@ export async function documentLoader<T = any>(url: string): Promise<DocumentCont
     document: context
   }
 }
+
+export const defaultDocumentLoader: DocumentLoader = extendContextLoader(documentLoader)

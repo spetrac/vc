@@ -2,9 +2,9 @@
  * Copyright (c) 2019-2023 Digital Bazaar, Inc. All rights reserved.
  */
 
-//@ts-expect-error
+//@ts-ignore
 import jsigs from 'jsonld-signatures'
-//@ts-expect-error
+//@ts-ignore
 import jsonld from 'jsonld'
 
 import type { DocumentLoader } from './documentLoader.js'
@@ -20,7 +20,7 @@ declare interface AssertionProofPurpose { }
  * method in a proof was authorized by its declared controller for the
  * proof's purpose.
  */
-export class CredentialIssuancePurpose extends AssertionProofPurpose {
+export default class CredentialIssuancePurpose extends AssertionProofPurpose {
 
   constructor(param?: {
     controller?: string,

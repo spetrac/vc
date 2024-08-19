@@ -37,10 +37,10 @@
 
 import { assertCredentialContext, assertDateString, checkContextVersion, getContextForVersion, dateRegex } from './helpers.js'
 import { documentLoader as _documentLoader } from './documentLoader.js'
-import { CredentialIssuancePurpose } from './CredentialIssuancePurpose.js'
-//@ts-expect-error
+import CredentialIssuancePurpose from './CredentialIssuancePurpose.js'
+//@ts-ignore
 import jsigs from 'jsonld-signatures'
-//@ts-expect-error
+//@ts-ignore
 import jsonld from 'jsonld'
 import type { DocumentLoader } from './documentLoader.js'
 type StatusChecker = Function
@@ -713,7 +713,7 @@ function _checkCredentialSubjects({ credential }: { credential?: Record<any, any
   if (!credential?.credentialSubject) throw new Error('"credentialSubject" property is required.')
   if (Array.isArray(credential?.credentialSubject))
     credential?.credentialSubject.forEach(subject => _checkCredentialSubject({ subject }))
-  _checkCredentialSubject({ subject: credential?.credentialSubject })
+  else _checkCredentialSubject({ subject: credential?.credentialSubject })
 }
 
 /**
