@@ -34,57 +34,44 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 import {
   assertCredentialContext,
   assertDateString,
   checkContextVersion,
-  getContextForVersion
-} from './helpers.js';
-import {documentLoader as _documentLoader} from './documentLoader.js';
-import {CredentialIssuancePurpose} from './CredentialIssuancePurpose.js';
-import jsigs from 'jsonld-signatures';
-import jsonld from 'jsonld';
+  getContextForVersion,
+  dateRegex
+} from './helpers.js'
+import { documentLoader as _documentLoader } from './documentLoader.js'
+import { CredentialIssuancePurpose } from './CredentialIssuancePurpose.js'
+import jsigs from 'jsonld-signatures'
+import jsonld from 'jsonld'
 
-const {AssertionProofPurpose, AuthenticationProofPurpose} = jsigs.purposes;
-export {dateRegex} from './helpers.js';
-export const defaultDocumentLoader = jsigs.extendContextLoader(_documentLoader);
-export {CredentialIssuancePurpose};
+const { AssertionProofPurpose, AuthenticationProofPurpose } = jsigs.purposes
+export const defaultDocumentLoader = jsigs.extendContextLoader(_documentLoader)
+export { CredentialIssuancePurpose }
 
-/**
- * @typedef {object} LinkedDataSignature
- */
+type LinkedDataSignature = Record<string, any>
+type Presentation = Record<string, any>
+type ProofPurpose = Record<string, any>
+type VerifiableCredential = Record<string, any>
+type VerifiablePresentation = Record<string, any>
 
-/**
- * @typedef {object} Presentation
- */
+type VerifyPresentationResult = {
+  /** True if verified, false if not. */
+  verified: boolean,
+  presentationResult: Record<string, any>,
+  credentialResults: Array<any>,
+  error?: Error
+}
 
-/**
- * @typedef {object} ProofPurpose
- */
-
-/**
- * @typedef {object} VerifiableCredential
- */
-
-/**
- * @typedef {object} VerifiablePresentation
- */
-
-/**
- * @typedef {object} VerifyPresentationResult
- * @property {boolean} verified - True if verified, false if not.
- * @property {object} presentationResult
- * @property {Array} credentialResults
- * @property {object} error
- */
-
-/**
- * @typedef {object} VerifyCredentialResult
- * @property {boolean} verified - True if verified, false if not.
- * @property {object} statusResult
- * @property {Array} results
- * @property {object} error
- */
+type VerifyCredentialResult = {
+  /** True if verified, false if not. */
+  verified: boolean,
+  statusResult: Record<string, any>,
+  results: Array<any>,
+  error?: Error
+}
 
 /**
  * Issues a verifiable credential (by taking a base credential document,
@@ -116,17 +103,17 @@ export async function issue({
 } = {}) {
   // check to make sure the `suite` has required params
   // Note: verificationMethod defaults to publicKey.id, in suite constructor
-  if(!suite) {
+  if (!suite) {
     throw new TypeError('"suite" parameter is required for issuing.');
   }
-  if(!suite.verificationMethod) {
+  if (!suite.verificationMethod) {
     throw new TypeError('"suite.verificationMethod" property is required.');
   }
 
-  if(!credential) {
+  if (!credential) {
     throw new TypeError('"credential" parameter is required for issuing.');
   }
-  if(checkContextVersion({
+  if (checkContextVersion({
     credential,
     version: 1.0
   }) && !credential.issuanceDate) {
@@ -135,9 +122,9 @@ export async function issue({
   }
 
   // run common credential checks
-  _checkCredential({credential, now, mode: 'issue'});
+  _checkCredential({ credential, now, mode: 'issue' });
 
-  return jsigs.sign(credential, {purpose, documentLoader, suite});
+  return jsigs.sign(credential, { purpose, documentLoader, suite });
 }
 
 /**
@@ -162,16 +149,16 @@ export async function derive({
   verifiableCredential, suite,
   documentLoader = defaultDocumentLoader
 } = {}) {
-  if(!verifiableCredential) {
+  if (!verifiableCredential) {
     throw new TypeError(
       '"verifiableCredential" parameter is required for deriving.');
   }
-  if(!suite) {
+  if (!suite) {
     throw new TypeError('"suite" parameter is required for deriving.');
   }
 
   // run common credential checks
-  _checkCredential({credential: verifiableCredential, mode: 'issue'});
+  _checkCredential({ credential: verifiableCredential, mode: 'issue' });
 
   return jsigs.derive(verifiableCredential, {
     purpose: new AssertionProofPurpose(),
@@ -223,17 +210,17 @@ export async function derive({
  * @returns {Promise<VerifyPresentationResult>} The verification result.
  */
 export async function verify(options = {}) {
-  const {presentation} = options;
+  const { presentation } = options;
   try {
-    if(!presentation) {
+    if (!presentation) {
       throw new TypeError(
         'A "presentation" property is required for verifying.');
     }
     return _verifyPresentation(options);
-  } catch(error) {
+  } catch (error) {
     return {
       verified: false,
-      results: [{presentation, verified: false, error}],
+      results: [{ presentation, verified: false, error }],
       error
     };
   }
@@ -268,17 +255,17 @@ export async function verify(options = {}) {
  * @returns {Promise<VerifyCredentialResult>} The verification result.
  */
 export async function verifyCredential(options = {}) {
-  const {credential} = options;
+  const { credential } = options;
   try {
-    if(!credential) {
+    if (!credential) {
       throw new TypeError(
         'A "credential" property is required for verifying.');
     }
     return await _verifyCredential(options);
-  } catch(error) {
+  } catch (error) {
     return {
       verified: false,
-      results: [{credential, verified: false, error}],
+      results: [{ credential, verified: false, error }],
       error
     };
   }
@@ -306,13 +293,13 @@ export async function verifyCredential(options = {}) {
  * @returns {Promise<VerifyCredentialResult>} The verification result.
  */
 async function _verifyCredential(options = {}) {
-  const {credential, checkStatus, now} = options;
+  const { credential, checkStatus, now } = options;
 
   // run common credential checks
-  _checkCredential({credential, now});
+  _checkCredential({ credential, now });
 
   // if credential status is provided, a `checkStatus` function must be given
-  if(credential.credentialStatus && typeof options.checkStatus !== 'function') {
+  if (credential.credentialStatus && typeof options.checkStatus !== 'function') {
     throw new TypeError(
       'A "checkStatus" function must be given to verify credentials with ' +
       '"credentialStatus".');
@@ -320,22 +307,22 @@ async function _verifyCredential(options = {}) {
 
   const documentLoader = options.documentLoader || defaultDocumentLoader;
 
-  const {controller} = options;
+  const { controller } = options;
   const purpose = options.purpose || new CredentialIssuancePurpose({
     controller
   });
 
   const result = await jsigs.verify(
-    credential, {...options, purpose, documentLoader});
+    credential, { ...options, purpose, documentLoader });
 
   // if verification has already failed, skip status check
-  if(!result.verified) {
+  if (!result.verified) {
     return result;
   }
 
-  if(credential.credentialStatus) {
+  if (credential.credentialStatus) {
     result.statusResult = await checkStatus(options);
-    if(!result.statusResult.verified) {
+    if (!result.statusResult.verified) {
       result.verified = false;
     }
   }
@@ -364,23 +351,23 @@ async function _verifyCredential(options = {}) {
 export function createPresentation({
   verifiableCredential, id, holder, now, version = 2.0
 } = {}) {
-  const initialContext = getContextForVersion({version});
+  const initialContext = getContextForVersion({ version });
   const presentation = {
     '@context': [initialContext],
     type: ['VerifiablePresentation']
   };
-  if(verifiableCredential) {
+  if (verifiableCredential) {
     const credentials = [].concat(verifiableCredential);
     // ensure all credentials are valid
-    for(const credential of credentials) {
-      _checkCredential({credential, now});
+    for (const credential of credentials) {
+      _checkCredential({ credential, now });
     }
     presentation.verifiableCredential = credentials;
   }
-  if(id) {
+  if (id) {
     presentation.id = id;
   }
-  if(holder) {
+  if (holder) {
     presentation.holder = holder;
   }
 
@@ -411,7 +398,7 @@ export function createPresentation({
  *   a proof.
  */
 export async function signPresentation(options = {}) {
-  const {presentation, domain, challenge} = options;
+  const { presentation, domain, challenge } = options;
   const purpose = options.purpose || new AuthenticationProofPurpose({
     domain,
     challenge
@@ -419,7 +406,7 @@ export async function signPresentation(options = {}) {
 
   const documentLoader = options.documentLoader || defaultDocumentLoader;
 
-  return jsigs.sign(presentation, {...options, purpose, documentLoader});
+  return jsigs.sign(presentation, { ...options, purpose, documentLoader });
 }
 
 /**
@@ -462,7 +449,7 @@ export async function signPresentation(options = {}) {
  * @returns {Promise<VerifyPresentationResult>} The verification result.
  */
 async function _verifyPresentation(options = {}) {
-  const {presentation, unsignedPresentation} = options;
+  const { presentation, unsignedPresentation } = options;
 
   _checkPresentation(presentation);
 
@@ -475,38 +462,38 @@ async function _verifyPresentation(options = {}) {
   let credentialResults;
   let verified = true;
   const credentials = jsonld.getValues(presentation, 'verifiableCredential');
-  if(credentials.length > 0) {
+  if (credentials.length > 0) {
     // verify every credential in `verifiableCredential`
     credentialResults = await Promise.all(credentials.map(credential => {
-      return verifyCredential({...options, credential, documentLoader});
+      return verifyCredential({ ...options, credential, documentLoader });
     }));
 
-    for(const [i, credentialResult] of credentialResults.entries()) {
+    for (const [i, credentialResult] of credentialResults.entries()) {
       credentialResult.credentialId = credentials[i].id;
     }
 
     const allCredentialsVerified = credentialResults.every(r => r.verified);
-    if(!allCredentialsVerified) {
+    if (!allCredentialsVerified) {
       verified = false;
     }
   }
 
-  if(unsignedPresentation) {
+  if (unsignedPresentation) {
     // No need to verify the proof section of this presentation
-    return {verified, results: [presentation], credentialResults};
+    return { verified, results: [presentation], credentialResults };
   }
 
-  const {controller, domain, challenge} = options;
-  if(!options.presentationPurpose && !challenge) {
+  const { controller, domain, challenge } = options;
+  if (!options.presentationPurpose && !challenge) {
     throw new Error(
       'A "challenge" param is required for AuthenticationProofPurpose.');
   }
 
   const purpose = options.presentationPurpose ||
-    new AuthenticationProofPurpose({controller, domain, challenge});
+    new AuthenticationProofPurpose({ controller, domain, challenge });
 
   const presentationResult = await jsigs.verify(
-    presentation, {...options, purpose, documentLoader});
+    presentation, { ...options, purpose, documentLoader });
 
   return {
     presentationResult,
@@ -523,11 +510,11 @@ async function _verifyPresentation(options = {}) {
  * @private
  */
 function _getId(obj) {
-  if(typeof obj === 'string') {
+  if (typeof obj === 'string') {
     return obj;
   }
 
-  if(!('id' in obj)) {
+  if (!('id' in obj)) {
     return;
   }
 
@@ -545,12 +532,12 @@ export function _checkPresentation(presentation) {
   // normalize to an array to allow the common case of context being a string
   const context = Array.isArray(presentation['@context']) ?
     presentation['@context'] : [presentation['@context']];
-  assertCredentialContext({context});
+  assertCredentialContext({ context });
 
   const types = jsonld.getValues(presentation, 'type');
 
   // check type presence
-  if(!types.includes('VerifiablePresentation')) {
+  if (!types.includes('VerifiablePresentation')) {
     throw new Error('"type" must include "VerifiablePresentation".');
   }
 }
@@ -580,78 +567,78 @@ const mustHaveType = [
 export function _checkCredential({
   credential, now = new Date(), mode = 'verify'
 } = {}) {
-  if(typeof now === 'string') {
+  if (typeof now === 'string') {
     now = new Date(now);
   }
-  assertCredentialContext({context: credential['@context']});
+  assertCredentialContext({ context: credential['@context'] });
 
   // check type presence and cardinality
-  if(!credential.type) {
+  if (!credential.type) {
     throw new Error('"type" property is required.');
   }
 
-  if(!jsonld.getValues(credential, 'type').includes('VerifiableCredential')) {
+  if (!jsonld.getValues(credential, 'type').includes('VerifiableCredential')) {
     throw new Error('"type" must include `VerifiableCredential`.');
   }
 
-  _checkCredentialSubjects({credential});
+  _checkCredentialSubjects({ credential });
 
-  if(!credential.issuer) {
+  if (!credential.issuer) {
     throw new Error('"issuer" property is required.');
   }
-  if(checkContextVersion({credential, version: 1.0})) {
+  if (checkContextVersion({ credential, version: 1.0 })) {
     // check issuanceDate exists
-    if(!credential.issuanceDate) {
+    if (!credential.issuanceDate) {
       throw new Error('"issuanceDate" property is required.');
     }
     // check issuanceDate format on issue
-    assertDateString({credential, prop: 'issuanceDate'});
+    assertDateString({ credential, prop: 'issuanceDate' });
 
     // check issuanceDate cardinality
-    if(jsonld.getValues(credential, 'issuanceDate').length > 1) {
+    if (jsonld.getValues(credential, 'issuanceDate').length > 1) {
       throw new Error('"issuanceDate" property can only have one value.');
     }
     // optionally check expirationDate
-    if('expirationDate' in credential) {
+    if ('expirationDate' in credential) {
       // check if `expirationDate` property is a date
-      assertDateString({credential, prop: 'expirationDate'});
-      if(mode === 'verify') {
+      assertDateString({ credential, prop: 'expirationDate' });
+      if (mode === 'verify') {
         // check if `now` is after `expirationDate`
-        if(now > new Date(credential.expirationDate)) {
+        if (now > new Date(credential.expirationDate)) {
           throw new Error('Credential has expired.');
         }
       }
     }
     // check if `now` is before `issuanceDate` on verification
-    if(mode === 'verify') {
+    if (mode === 'verify') {
       const issuanceDate = new Date(credential.issuanceDate);
-      if(now < issuanceDate) {
+      if (now < issuanceDate) {
         throw new Error(
           `The current date time (${now.toISOString()}) is before the ` +
           `"issuanceDate" (${credential.issuanceDate}).`);
       }
     }
   }
-  if(checkContextVersion({credential, version: 2.0})) {
+  if (checkContextVersion({ credential, version: 2.0 })) {
     // check if 'validUntil' and 'validFrom'
-    let {validUntil, validFrom} = credential;
-    if(validUntil) {
-      assertDateString({credential, prop: 'validUntil'});
-      if(mode === 'verify') {
+    let { validUntil, validFrom } = credential;
+    if (validUntil) {
+      assertDateString({ credential, prop: 'validUntil' });
+      if (mode === 'verify') {
         validUntil = new Date(credential.validUntil);
-        if(now > validUntil) {
+        if (now > validUntil) {
           throw new Error(
             `The current date time (${now.toISOString()}) is after ` +
             `"validUntil" (${credential.validUntil}).`);
         }
       }
     }
-    if(validFrom) {
-      assertDateString({credential, prop: 'validFrom'});
-      if(mode === 'verify') {
-      // check if `now` is before `validFrom`
+    if (validFrom) {
+      assertDateString({ credential, prop: 'validFrom' });
+      if (mode === 'verify') {
+        // check if `now` is before `validFrom`
         validFrom = new Date(credential.validFrom);
-        if(now < validFrom) {
+        if (now < validFrom) {
           throw new Error(
             `The current date time (${now.toISOString()}) is before ` +
             `"validFrom" (${credential.validFrom}).`);
@@ -660,28 +647,28 @@ export function _checkCredential({
     }
   }
   // check issuer cardinality
-  if(jsonld.getValues(credential, 'issuer').length > 1) {
+  if (jsonld.getValues(credential, 'issuer').length > 1) {
     throw new Error('"issuer" property can only have one value.');
   }
 
   // check issuer is a URL
-  if('issuer' in credential) {
+  if ('issuer' in credential) {
     const issuer = _getId(credential.issuer);
-    if(!issuer) {
+    if (!issuer) {
       throw new Error(`"issuer" id is required.`);
     }
-    _validateUriId({id: issuer, propertyName: 'issuer'});
+    _validateUriId({ id: issuer, propertyName: 'issuer' });
   }
 
   // check credentialStatus
   jsonld.getValues(credential, 'credentialStatus').forEach(cs => {
     // check if optional "id" is a URL
-    if('id' in cs) {
-      _validateUriId({id: cs.id, propertyName: 'credentialStatus.id'});
+    if ('id' in cs) {
+      _validateUriId({ id: cs.id, propertyName: 'credentialStatus.id' });
     }
 
     // check "type" present
-    if(!cs.type) {
+    if (!cs.type) {
       throw new Error('"credentialStatus" must include a type.');
     }
   });
@@ -689,17 +676,17 @@ export function _checkCredential({
   // check evidences are URLs
   jsonld.getValues(credential, 'evidence').forEach(evidence => {
     const evidenceId = _getId(evidence);
-    if(evidenceId) {
-      _validateUriId({id: evidenceId, propertyName: 'evidence'});
+    if (evidenceId) {
+      _validateUriId({ id: evidenceId, propertyName: 'evidence' });
     }
   });
 
   // check if properties that require a type are
   // defined, objects, and objects with types
-  for(const prop of mustHaveType) {
-    if(prop in credential) {
+  for (const prop of mustHaveType) {
+    if (prop in credential) {
       const _value = credential[prop];
-      if(Array.isArray(_value)) {
+      if (Array.isArray(_value)) {
         _value.forEach(entry => _checkTypedObject(entry, prop));
         continue;
       }
@@ -710,139 +697,80 @@ export function _checkCredential({
 
 /**
  * @private
- * Checks that a property is non-empty object with
- * property type.
- *
- * @param {object} obj - A potential object.
- * @param {string} name - The name of the property.
- *
- * @throws {Error} if the property is not an object with a type.
- *
- * @returns {undefined} - Returns on success.
+ * Checks that a property is non-empty object with property type.
+ * @param obj A potential object.
+ * @param name The name of the property.
+ * @throws if the property is not an object with a type.
+ * @returns Returns on success.
  */
-function _checkTypedObject(obj, name) {
-  if(!isObject(obj)) {
-    throw new Error(`property "${name}" must be an object.`);
-  }
-  if(_emptyObject(obj)) {
-    throw new Error(`property "${name}" can not be an empty object.`);
-  }
-  if(!('type' in obj)) {
-    throw new Error(`property "${name}" must have property type.`);
-  }
+function _checkTypedObject(obj: Record<any, any>, name: string): void {
+  if (!isObject(obj)) throw new Error(`property "${name}" must be an object.`)
+  if (_emptyObject(obj)) throw new Error(`property "${name}" can not be an empty object.`)
+  if (!('type' in obj)) throw new Error(`property "${name}" must have property type.`)
 }
 
 /**
  * @private
  * Takes in a credential and checks the credentialSubject(s)
- *
- * @param {object} options - Options.
- * @param {object} options.credential - The credential to check.
- *
- * @throws {Error} error - Throws on errors in the credential subject.
- *
- * @returns {undefined} - Returns on success.
+ * @param credential - The credential to check.
+ * @throws Throws on errors in the credential subject.
+ * @returns Returns on success.
 */
-function _checkCredentialSubjects({credential}) {
-  if(!credential?.credentialSubject) {
-    throw new Error('"credentialSubject" property is required.');
-  }
-  if(Array.isArray(credential?.credentialSubject)) {
-    return credential?.credentialSubject.map(
-      subject => _checkCredentialSubject({subject}));
-  }
-  return _checkCredentialSubject({subject: credential?.credentialSubject});
+function _checkCredentialSubjects({ credential }: { credential?: Record<any, any> }): void {
+  if (!credential?.credentialSubject) throw new Error('"credentialSubject" property is required.')
+  if (Array.isArray(credential?.credentialSubject))
+    credential?.credentialSubject.forEach(subject => _checkCredentialSubject({ subject }))
+  _checkCredentialSubject({ subject: credential?.credentialSubject })
 }
 
 /**
  * @private
- *
  * Checks a credential subject is valid.
- *
- * @param {object} options - Options.
- * @param {object} options.subject - A potential credential subject.
- *
- * @throws {Error} If the credentialSubject is not valid.
- *
- * @returns {undefined} Returns on success.
+ * @param subject A potential credential subject.
+ * @throws If the credentialSubject is not valid.
+ * @returns Returns on success.
  */
-function _checkCredentialSubject({subject}) {
-  if(isObject(subject) === false) {
-    throw new Error('"credentialSubject" must be a non-null object.');
-  }
-  if(_emptyObject(subject)) {
-    throw new Error('"credentialSubject" must make a claim.');
-  }
+function _checkCredentialSubject({ subject }: { subject?: Record<any, any> }): void {
+  if (!isObject(subject)) throw new Error('"credentialSubject" must be a non-null object.')
+  if (_emptyObject(subject)) throw new Error('"credentialSubject" must make a claim.')
   // If credentialSubject.id is present and is not a URI, reject it
-  if(subject.id) {
-    _validateUriId({
-      id: subject.id, propertyName: 'credentialSubject.id'
-    });
-  }
+  if (subject.id) _validateUriId({ id: subject.id, propertyName: 'credentialSubject.id' })
 }
 
 /**
  * @private
  * Checks if parameter is an object.
- *
- * @param {object} obj - A potential object.
- *
- * @returns {boolean} - Returns false if not an object or null.
+ * @param obj A potential object.
+ * @returns Returns false if not an object or null.
  */
-function isObject(obj) {
-  // return false for null even though it has type object
-  if(obj === null) {
-    return false;
-  }
-  // if something has type object and is not null return true
-  if((typeof obj) === 'object') {
-    return true;
-  }
-  // return false for strings, symbols, etc.
-  return false;
+function isObject(obj: unknown): obj is Record<any, any> {
+  return obj !== null && typeof obj === 'object'
 }
 
 /**
  * @private
  * Is it an empty object?
- *
- * @param {object} obj - A potential object.
- *
- * @returns {boolean} - Is it empty?
+ * @param obj A potential object.
+ * @returns Is it empty?
  */
-function _emptyObject(obj) {
-  // if the parameter is not an object return true
-  // as a non-object is an empty object
-  if(!isObject(obj)) {
-    return true;
-  }
-  return Object.keys(obj).length === 0;
+function _emptyObject(obj: unknown): obj is (typeof obj extends Record<any, any> ? {} : never) {
+  return !isObject(obj) || Object.keys(obj).length === 0
 }
 
 /**
  * @private
- *
  * Validates if an ID is a URL.
- *
- * @param {object} options - Options.
- * @param {string} options.id - the id.
- * @param {string} options.propertyName - The property name.
- *
- * @throws {Error} Throws if an id is not a URL.
- *
- * @returns {undefined} Returns on success.
+ * @param id The id.
+ * @param propertyName The property name.
+ * @throws Throws if an id is not a URL.
+ * @returns Returns on success.
  */
-function _validateUriId({id, propertyName}) {
-  let parsed;
+function _validateUriId({ id, propertyName }: { id: string, propertyName: string }): void {
+  let parsed
   try {
-    parsed = new URL(id);
-  } catch(e) {
-    const error = new TypeError(`"${propertyName}" must be a URI: "${id}".`);
-    error.cause = e;
-    throw error;
+    parsed = new URL(id)
+  } catch (e) {
+    throw new TypeError(`"${propertyName}" must be a URI: "${id}".`, { cause: e })
   }
-
-  if(!parsed.protocol) {
-    throw new TypeError(`"${propertyName}" must be a URI: "${id}".`);
-  }
+  if (!parsed.protocol) throw new TypeError(`"${propertyName}" must be a URI: "${id}".`)
 }
