@@ -2,26 +2,33 @@
  * Copyright (c) 2019-2023 Digital Bazaar, Inc. All rights reserved.
  */
 
+//@ts-expect-error
 import jsigs from 'jsonld-signatures'
+//@ts-expect-error
 import jsonld from 'jsonld'
 
+import type { DocumentLoader } from './documentLoader.js'
 type Proof = Record<string, any>
 type Document = Record<string, any>
 type Suite = Record<string, any>
-type DocumentContext<T = any> = {
-  contextUrl?: string
-  documentUrl: string
-  document: T
-  tag?: string
-}
-type DocumentLoader = (url: string) => DocumentContext
+
+const { AssertionProofPurpose } = jsigs.purposes
+declare interface AssertionProofPurpose { }
 
 /**
  * Creates a proof purpose that will validate whether or not the verification
  * method in a proof was authorized by its declared controller for the
  * proof's purpose.
  */
-export class CredentialIssuancePurpose extends jsigs.purposes.AssertionProofPurpose {
+export class CredentialIssuancePurpose extends AssertionProofPurpose {
+
+  constructor(param?: {
+    controller?: string,
+    date?: string | Date,
+    maxTimestampDelta?: number
+  }) {
+    super(param || {});
+  }
 
   /**
    * Validates the purpose of a proof. This method is called during

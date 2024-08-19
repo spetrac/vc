@@ -2,6 +2,7 @@
  * Copyright (c) 2023 Digital Bazaar, Inc. All rights reserved.
  */
 
+//@ts-expect-error
 import { named as namedContexts } from '@digitalbazaar/credentials-context'
 
 // Z and T must be uppercase
@@ -57,7 +58,7 @@ export function assertDateString({ credential, prop }: { credential: Record<stri
  * @param {object} credential A VC.
  * @returns  A number representing the version.
  */
-function getContextVersion({ credential }: { credential?: Record<string, any> } = {}): number | undefined {
+function getContextVersion({ credential }: { credential?: Record<string, any> }): number | undefined {
   const firstContext = credential?.['@context']?.[0]
   return credentialsContextUrlToVersion.get(firstContext)
 }

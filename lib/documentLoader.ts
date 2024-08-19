@@ -3,11 +3,14 @@
  */
 
 // load locally embedded contexts
+//@ts-expect-error
 import { contexts as credentialsContexts } from '@digitalbazaar/credentials-context'
 
 const contexts = new Map([...credentialsContexts])
 
-type DocumentContext<T = any> = {
+
+export type DocumentLoader = (url: string) => DocumentContext
+export type DocumentContext<T = any> = {
   contextUrl?: string
   documentUrl: string
   document: T

@@ -35,19 +35,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import {
-  assertCredentialContext,
-  assertDateString,
-  checkContextVersion,
-  getContextForVersion,
-  dateRegex
-} from './helpers.js'
+import { assertCredentialContext, assertDateString, checkContextVersion, getContextForVersion, dateRegex } from './helpers.js'
 import { documentLoader as _documentLoader } from './documentLoader.js'
 import { CredentialIssuancePurpose } from './CredentialIssuancePurpose.js'
+//@ts-expect-error
 import jsigs from 'jsonld-signatures'
+//@ts-expect-error
 import jsonld from 'jsonld'
+import type { DocumentLoader } from './documentLoader.js'
+type StatusChecker = Function
 
 const { AssertionProofPurpose, AuthenticationProofPurpose } = jsigs.purposes
+declare interface AssertionProofPurpose { }
+declare interface AuthenticationProofPurpose { }
 export const defaultDocumentLoader = jsigs.extendContextLoader(_documentLoader)
 export { CredentialIssuancePurpose }
 
@@ -60,59 +60,52 @@ type VerifiablePresentation = Record<string, any>
 type VerifyPresentationResult = {
   /** True if verified, false if not. */
   verified: boolean,
-  presentationResult: Record<string, any>,
-  credentialResults: Array<any>,
+  results?: VerifiablePresentation[],
+  presentationResult?: Record<string, any>,
+  credentialResults: Array<VerifyCredentialResult>,
   error?: Error
 }
 
 type VerifyCredentialResult = {
   /** True if verified, false if not. */
   verified: boolean,
-  statusResult: Record<string, any>,
+  statusResult?: Record<string, any>,
   results: Array<any>,
-  error?: Error
+  error?: Error,
+  credentialId?: string
 }
 
 /**
  * Issues a verifiable credential (by taking a base credential document,
  * and adding a digital signature to it).
- *
- * @param {object} [options={}] - The options to use.
- *
- * @param {object} options.credential - Base credential document.
- * @param {LinkedDataSignature} options.suite - Signature suite (with private
- *   key material or an API to use it), passed in to sign().
- *
- * @param {ProofPurpose} [options.purpose] - A ProofPurpose. If not specified,
- *   a default purpose will be created.
- *
- * Other optional params passed to `sign()`:
- * @param {object} [options.documentLoader] - A document loader.
- * @param {string|Date} [options.now] - A string representing date time in
- *   ISO 8601 format or an instance of Date. Defaults to current date time.
- *
- * @throws {Error} If missing required properties.
- *
- * @returns {Promise<VerifiableCredential>} Resolves on completion.
+ * @param credential Base credential document.
+ * @param suite Signature suite (with private key material or an API to use it), 
+ * passed in to sign().
+ * @param purpose A ProofPurpose. If not specified, a default purpose will be created.
+ * @param documentLoader A document loader.
+ * @param now A string representing date time in ISO 8601 format or an instance of Date. Defaults to current date time.
+ * @throws If missing required properties.
+ * @returns Resolves on completion.
  */
 export async function issue({
-  credential, suite,
+  credential,
+  suite,
   purpose = new CredentialIssuancePurpose(),
   documentLoader = defaultDocumentLoader,
   now
-} = {}) {
+}: {
+  credential: Record<any, any>,
+  suite: LinkedDataSignature,
+  purpose?: ProofPurpose,
+  documentLoader?: DocumentLoader,
+  now?: string | Date
+}): Promise<VerifiableCredential> {
   // check to make sure the `suite` has required params
   // Note: verificationMethod defaults to publicKey.id, in suite constructor
-  if (!suite) {
-    throw new TypeError('"suite" parameter is required for issuing.');
-  }
-  if (!suite.verificationMethod) {
-    throw new TypeError('"suite.verificationMethod" property is required.');
-  }
+  if (!suite) throw new TypeError('"suite" parameter is required for issuing.');
+  if (!suite.verificationMethod) throw new TypeError('"suite.verificationMethod" property is required.');
+  if (!credential) throw new TypeError('"credential" parameter is required for issuing.');
 
-  if (!credential) {
-    throw new TypeError('"credential" parameter is required for issuing.');
-  }
   if (checkContextVersion({
     credential,
     version: 1.0
@@ -131,24 +124,21 @@ export async function issue({
  * Derives a proof from the given verifiable credential, resulting in a new
  * verifiable credential. This method is usually used to generate selective
  * disclosure and / or unlinkable proofs.
- *
- * @param {object} [options={}] - The options to use.
- *
- * @param {object} options.verifiableCredential - The verifiable credential
- *   containing a base proof to derive another proof from.
- * @param {LinkedDataSignature} options.suite - Derived proof signature suite.
- *
- * Other optional params passed to `derive()`:
- * @param {object} [options.documentLoader] - A document loader.
- *
- * @throws {Error} If missing required properties.
- *
- * @returns {Promise<VerifiableCredential>} Resolves on completion.
+ * @param verifiableCredential The verifiable credential containing a base proof to derive another proof from.
+ * @param suite Derived proof signature suite.
+ * @param documentLoader A document loader.
+ * @throws If missing required properties.
+ * @returns Resolves on completion.
  */
 export async function derive({
-  verifiableCredential, suite,
+  verifiableCredential,
+  suite,
   documentLoader = defaultDocumentLoader
-} = {}) {
+}: {
+  verifiableCredential: Record<any, any>,
+  suite: LinkedDataSignature,
+  documentLoader?: DocumentLoader
+}): Promise<VerifiableCredential> {
   if (!verifiableCredential) {
     throw new TypeError(
       '"verifiableCredential" parameter is required for deriving.');
@@ -173,13 +163,11 @@ export async function derive({
  *   - Checks the proofs (for example, checks digital signatures against the
  *     provided public keys).
  *
- * @param {object} [options={}] - The options to use.
- *
- * @param {VerifiablePresentation} options.presentation - Verifiable
+ * @param presentation Verifiable
  *   presentation, signed or unsigned, that may contain within it a
  *   verifiable credential.
  *
- * @param {LinkedDataSignature|LinkedDataSignature[]} options.suite - One or
+ * @param suite One or
  *   more signature suites that are supported by the caller's use case. This is
  *   an explicit design decision -- the calling code must specify which
  *   signature types (ed25519, RSA, etc) are allowed.
@@ -187,42 +175,49 @@ export async function derive({
  *   key material (to verify against) is to be handled by the documentLoader,
  *   the suite param can optionally include the key directly.
  *
- * @param {boolean} [options.unsignedPresentation=false] - By default, this
+ * @param unsignedPresentation By default, this
  *   function assumes that a presentation is signed (and will return an error if
  *   a `proof` section is missing). Set this to `true` if you're using an
  *   unsigned presentation.
  *
  * Either pass in a proof purpose,
- * @param {AuthenticationProofPurpose} [options.presentationPurpose] - Optional
- *   proof purpose (a default one will be created if not passed in).
+ * @param presentationPurpose Optional proof purpose (a default one will be created if not passed in).
  *
  * or a default purpose will be created with params:
- * @param {string} [options.challenge] - Required if purpose is not passed in.
- * @param {string} [options.controller] - A controller.
- * @param {string} [options.domain] - A domain.
+ * @param challenge Required if purpose is not passed in.
+ * @param controller A controller.
+ * @param domain A domain.
  *
- * @param {Function} [options.documentLoader] - A document loader.
- * @param {Function} [options.checkStatus] - Optional function for checking
- *   credential status if `credentialStatus` is present on the credential.
- * @param {string|Date} [options.now] - A string representing date time in
- *   ISO 8601 format or an instance of Date. Defaults to current date time.
+ * @param documentLoader A document loader.
+ * @param checkStatus Optional function for checking credential status 
+ * if `credentialStatus` is present on the credential.
+ * @param now A string representing date time in ISO 8601 format or an instance of Date. 
+ * Defaults to current date time.
  *
- * @returns {Promise<VerifyPresentationResult>} The verification result.
+ * @returns The verification result.
  */
-export async function verify(options = {}) {
-  const { presentation } = options;
+export async function verify(options: {
+  presentation: VerifiablePresentation,
+  suite: LinkedDataSignature | LinkedDataSignature[],
+  unsignedPresentation?: boolean,
+  documentLoader?: DocumentLoader,
+  checkStatus?: StatusChecker,
+  now?: Date | string,
+  presentationPurpose?: AuthenticationProofPurpose,
+  challenge?: string,
+  controller?: string,
+  domain?: string
+}) {
+  const { presentation } = options
   try {
-    if (!presentation) {
-      throw new TypeError(
-        'A "presentation" property is required for verifying.');
-    }
+    if (!presentation) throw new TypeError('A "presentation" property is required for verifying.')
     return _verifyPresentation(options);
   } catch (error) {
     return {
       verified: false,
       results: [{ presentation, verified: false, error }],
       error
-    };
+    }
   }
 }
 
@@ -232,11 +227,9 @@ export async function verify(options = {}) {
  *   - Checks the proofs (for example, checks digital signatures against the
  *     provided public keys).
  *
- * @param {object} [options={}] - The options.
+ * @param credential Verifiable credential.
  *
- * @param {object} options.credential - Verifiable credential.
- *
- * @param {LinkedDataSignature|LinkedDataSignature[]} options.suite - One or
+ * @param suite One or
  *   more signature suites that are supported by the caller's use case. This is
  *   an explicit design decision -- the calling code must specify which
  *   signature types (ed25519, RSA, etc) are allowed.
@@ -244,55 +237,63 @@ export async function verify(options = {}) {
  *   key material (to verify against) is to be handled by the documentLoader,
  *   the suite param can optionally include the key directly.
  *
- * @param {CredentialIssuancePurpose} [options.purpose] - Optional
- *   proof purpose (a default one will be created if not passed in).
- * @param {Function} [options.documentLoader] - A document loader.
- * @param {Function} [options.checkStatus] - Optional function for checking
- *   credential status if `credentialStatus` is present on the credential.
- * @param {string|Date} [options.now] - A string representing date time in
- *   ISO 8601 format or an instance of Date. Defaults to current date time.
+ * @param purpose Optional  proof purpose (a default one will be created if not passed in).
+ * @param documentLoader A document loader.
+ * @param checkStatus Optional function for checking credential status 
+ * if `credentialStatus` is present on the credential.
+ * @param now A string representing date time in ISO 8601 format or an instance of Date. 
+ * Defaults to current date time.
  *
- * @returns {Promise<VerifyCredentialResult>} The verification result.
+ * @returns The verification result.
  */
-export async function verifyCredential(options = {}) {
+export async function verifyCredential(options: {
+  credential: any,
+  suite: LinkedDataSignature | LinkedDataSignature[],
+  purpose?: CredentialIssuancePurpose,
+  documentLoader?: DocumentLoader,
+  checkStatus?: StatusChecker,
+  now?: string | Date
+}): Promise<VerifyCredentialResult> {
   const { credential } = options;
   try {
-    if (!credential) {
-      throw new TypeError(
-        'A "credential" property is required for verifying.');
-    }
+    if (!credential) throw new TypeError('A "credential" property is required for verifying.')
     return await _verifyCredential(options);
   } catch (error) {
     return {
       verified: false,
       results: [{ credential, verified: false, error }],
-      error
+      error: error as Error
     };
   }
 }
 
 /**
  * Verifies a verifiable credential.
- *
  * @private
- * @param {object} [options={}] - The options.
- *
- * @param {object} options.credential - Verifiable credential.
- * @param {LinkedDataSignature|LinkedDataSignature[]} options.suite - See the
+ * 
+ * @param credential Verifiable credential.
+ * @param suite See the
  *   definition in the `verify()` docstring, for this param.
- * @param {string|Date} [options.now] - A string representing date time in
+ * @param now A string representing date time in
  *   ISO 8601 format or an instance of Date. Defaults to current date time.
  *
- * @throws {Error} If required parameters are missing (in `_checkCredential`).
- *
- * @param {CredentialIssuancePurpose} [options.purpose] - A purpose.
- * @param {Function} [options.documentLoader] - A document loader.
- * @param {Function} [options.checkStatus] - Optional function for checking
+ * @param purpose A purpose.
+ * @param documentLoader A document loader.
+ * @param checkStatus Optional function for checking
  *   credential status if `credentialStatus` is present on the credential.
  *
- * @returns {Promise<VerifyCredentialResult>} The verification result.
+ * @throws If required parameters are missing (in `_checkCredential`).
+ * @returns The verification result.
  */
-async function _verifyCredential(options = {}) {
+async function _verifyCredential(options: {
+  credential: any,
+  suite: LinkedDataSignature | LinkedDataSignature[],
+  now?: string | Date,
+  documentLoader?: DocumentLoader,
+  checkStatus?: StatusChecker,
+  purpose?: CredentialIssuancePurpose,
+  controller?: string
+}): Promise<VerifyCredentialResult> {
   const { credential, checkStatus, now } = options;
 
   // run common credential checks
@@ -307,10 +308,9 @@ async function _verifyCredential(options = {}) {
 
   const documentLoader = options.documentLoader || defaultDocumentLoader;
 
-  const { controller } = options;
   const purpose = options.purpose || new CredentialIssuancePurpose({
-    controller
-  });
+    controller: options.controller
+  })
 
   const result = await jsigs.verify(
     credential, { ...options, purpose, documentLoader });
@@ -320,7 +320,7 @@ async function _verifyCredential(options = {}) {
     return result;
   }
 
-  if (credential.credentialStatus) {
+  if (credential.credentialStatus && checkStatus) {
     result.statusResult = await checkStatus(options);
     if (!result.statusResult.verified) {
       result.verified = false;
@@ -332,27 +332,28 @@ async function _verifyCredential(options = {}) {
 /**
  * Creates an unsigned presentation from a given verifiable credential.
  *
- * @param {object} options - Options to use.
- * @param {object|Array<object>} [options.verifiableCredential] - One or more
+ * @param verifiableCredential One or more
  *   verifiable credential.
- * @param {string} [options.id] - Optional VP id.
- * @param {string} [options.holder] - Optional presentation holder url.
- * @param {string|Date} [options.now] - A string representing date time in
+ * @param id Optional VP id.
+ * @param options Optional presentation holder url.
+ * @param now A string representing date time in
  *   ISO 8601 format or an instance of Date. Defaults to current date time.
- * @param {number} [options.version = 2.0] - The VC context version to use.
- *
- * @throws {TypeError} If verifiableCredential param is missing.
- * @throws {Error} If the credential (or the presentation params) are missing
- *   required properties.
- *
- * @returns {Presentation} The credential wrapped inside of a
- *   VerifiablePresentation.
+ * @param version - The VC context version to use.
+ * @throws If verifiableCredential param is missing.
+ * @throws If the credential (or the presentation params) are missing required properties.
+ * @returns The credential wrapped inside of a VerifiablePresentation.
  */
 export function createPresentation({
   verifiableCredential, id, holder, now, version = 2.0
-} = {}) {
+}: {
+  verifiableCredential: any | any[],
+  id?: string,
+  holder?: string,
+  now?: string | Date,
+  version?: number
+}): Presentation {
   const initialContext = getContextForVersion({ version });
-  const presentation = {
+  const presentation: Presentation = {
     '@context': [initialContext],
     type: ['VerifiablePresentation']
   };
@@ -379,25 +380,27 @@ export function createPresentation({
 /**
  * Signs a given presentation.
  *
- * @param {object} [options={}] - Options to use.
- *
- * Required:
- * @param {Presentation} options.presentation - A presentation.
- * @param {LinkedDataSignature} options.suite - passed in to sign()
+ * @param presentation A presentation.
+ * @param suite passed in to sign()
  *
  * Either pass in a ProofPurpose, or a default one will be created with params:
- * @param {ProofPurpose} [options.purpose] - A ProofPurpose. If not specified,
- *   a default purpose will be created with the domain and challenge options.
+ * @param purpose A ProofPurpose. If not specified, a default purpose will be created with the domain and challenge options.
  *
- * @param {string} [options.domain] - A domain.
- * @param {string} options.challenge - A required challenge.
+ * @param domain A domain.
+ * @param challenge A required challenge.
  *
- * @param {Function} [options.documentLoader] - A document loader.
+ * @param documentLoader A document loader.
  *
- * @returns {Promise<{VerifiablePresentation}>} A VerifiablePresentation with
- *   a proof.
+ * @returns A VerifiablePresentation with a proof.
  */
-export async function signPresentation(options = {}) {
+export async function signPresentation(options: {
+  presentation: Presentation,
+  suite: LinkedDataSignature,
+  purpose?: ProofPurpose,
+  domain?: string,
+  challenge?: string,
+  documentLoader?: DocumentLoader
+}): Promise<VerifiablePresentation> {
   const { presentation, domain, challenge } = options;
   const purpose = options.purpose || new AuthenticationProofPurpose({
     domain,
@@ -414,41 +417,42 @@ export async function signPresentation(options = {}) {
  * proof signature if it's present. Also verifies all the VerifiableCredentials
  * that are present in the presentation, if any.
  *
- * @param {object} [options={}] - The options.
- * @param {VerifiablePresentation} options.presentation - A
- *   VerifiablePresentation.
- *
- * @param {LinkedDataSignature|LinkedDataSignature[]} options.suite - See the
- *   definition in the `verify()` docstring, for this param.
- *
- * @param {boolean} [options.unsignedPresentation=false] - By default, this
+ * @param presentation A VerifiablePresentation.
+ * @param suite See the definition in the `verify()` docstring, for this param.
+ * @param unsignedPresentation By default, this
  *   function assumes that a presentation is signed (and will return an error if
  *   a `proof` section is missing). Set this to `true` if you're using an
  *   unsigned presentation.
  *
  * Either pass in a proof purpose,
- * @param {AuthenticationProofPurpose} [options.presentationPurpose] - A
- *   ProofPurpose. If not specified, a default purpose will be created with
+ * @param presentationPurpose A ProofPurpose. If not specified, a default purpose will be created with
  *   the challenge, controller, and domain options.
  *
- * @param {string} [options.challenge] - A challenge. Required if purpose is
- *   not passed in.
- * @param {string} [options.controller] - A controller. Required if purpose is
- *   not passed in.
- * @param {string} [options.domain] - A domain. Required if purpose is not
- *   passed in.
+ * @param challenge A challenge. Required if purpose is not passed in.
+ * @param controller A controller. Required if purpose is not passed in.
+ * @param domain A domain. Required if purpose is not passed in.
  *
- * @param {Function} [options.documentLoader] - A document loader.
- * @param {Function} [options.checkStatus] - Optional function for checking
+ * @param documentLoader A document loader.
+ * @param checkStatus Optional function for checking
  *   credential status if `credentialStatus` is present on the credential.
- * @param {string|Date} [options.now] - A string representing date time in
+ * @param now A string representing date time in
  *   ISO 8601 format or an instance of Date. Defaults to current date time.
  *
- * @throws {Error} If presentation is missing required params.
- *
- * @returns {Promise<VerifyPresentationResult>} The verification result.
+ * @throws If presentation is missing required params.
+ * @returns The verification result.
  */
-async function _verifyPresentation(options = {}) {
+async function _verifyPresentation(options: {
+  presentation: VerifiablePresentation,
+  suite: LinkedDataSignature | LinkedDataSignature[],
+  unsignedPresentation?: boolean,
+  presentationPurpose?: AuthenticationProofPurpose,
+  challenge?: string,
+  controller?: string,
+  domain?: string,
+  documentLoader?: DocumentLoader,
+  checkStatus?: StatusChecker,
+  now?: string | Date
+}): Promise<VerifyPresentationResult> {
   const { presentation, unsignedPresentation } = options;
 
   _checkPresentation(presentation);
@@ -459,13 +463,13 @@ async function _verifyPresentation(options = {}) {
   // only if that proof is verified
 
   // if verifiableCredentials are present, verify them, individually
-  let credentialResults;
+  let credentialResults: Array<VerifyCredentialResult> = []
   let verified = true;
-  const credentials = jsonld.getValues(presentation, 'verifiableCredential');
+  const credentials = jsonld.getValues(presentation, 'verifiableCredential') as any[]
   if (credentials.length > 0) {
     // verify every credential in `verifiableCredential`
     credentialResults = await Promise.all(credentials.map(credential => {
-      return verifyCredential({ ...options, credential, documentLoader });
+      return verifyCredential({ ...options, credential, documentLoader })
     }));
 
     for (const [i, credentialResult] of credentialResults.entries()) {
@@ -504,31 +508,20 @@ async function _verifyPresentation(options = {}) {
 }
 
 /**
- * @param {string|object} obj - Either an object with an id property
- *   or a string that is an id.
- * @returns {string|undefined} Either an id or undefined.
+ * @param obj Either an object with an id property or a string that is an id.
+ * @returns Either an id or undefined.
  * @private
  */
-function _getId(obj) {
-  if (typeof obj === 'string') {
-    return obj;
-  }
-
-  if (!('id' in obj)) {
-    return;
-  }
-
-  return obj.id;
+function _getId(obj: string | { id: string }): string {
+  return typeof obj === 'string' ? obj : obj?.id
 }
 
 // export for testing
 /**
- * @param {object} presentation - An object that could be a presentation.
- *
- * @throws {Error}
+ * @param presentation - An object that could be a presentation.
  * @private
  */
-export function _checkPresentation(presentation) {
+export function _checkPresentation(presentation: any): void {
   // normalize to an array to allow the common case of context being a string
   const context = Array.isArray(presentation['@context']) ?
     presentation['@context'] : [presentation['@context']];
@@ -553,20 +546,20 @@ const mustHaveType = [
 
 // export for testing
 /**
- * @param {object} options - The options.
- * @param {object} options.credential - An object that could be a
- *   VerifiableCredential.
- * @param {string|Date} [options.now] - A string representing date time in
- *   ISO 8601 format or an instance of Date. Defaults to current date time.
- * @param {string} [options.mode] - The mode of operation for this
- *   validation function, either `issue` or `verify`.
- *
- * @throws {Error}
  * @private
+ * @param credential An object that could be a VerifiableCredential.
+ * @param now A string representing date time in ISO 8601 format or an instance of Date. Defaults to current date time.
+ * @param mode The mode of operation for this validation function, either `issue` or `verify`.
  */
 export function _checkCredential({
-  credential, now = new Date(), mode = 'verify'
-} = {}) {
+  credential,
+  now = new Date(),
+  mode = 'verify'
+}: {
+  credential: Record<any, any>,
+  now?: string | Date,
+  mode?: string
+}) {
   if (typeof now === 'string') {
     now = new Date(now);
   }
@@ -661,7 +654,7 @@ export function _checkCredential({
   }
 
   // check credentialStatus
-  jsonld.getValues(credential, 'credentialStatus').forEach(cs => {
+  jsonld.getValues(credential, 'credentialStatus').forEach((cs: any) => {
     // check if optional "id" is a URL
     if ('id' in cs) {
       _validateUriId({ id: cs.id, propertyName: 'credentialStatus.id' });
@@ -674,7 +667,7 @@ export function _checkCredential({
   });
 
   // check evidences are URLs
-  jsonld.getValues(credential, 'evidence').forEach(evidence => {
+  jsonld.getValues(credential, 'evidence').forEach((evidence: any) => {
     const evidenceId = _getId(evidence);
     if (evidenceId) {
       _validateUriId({ id: evidenceId, propertyName: 'evidence' });
