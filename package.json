@@ -11,7 +11,8 @@
   "contributors": [
     "Dave Longley <dlongley@digitalbazaar.com>",
     "David I. Lehn <dlehn@digitalbazaar.com>",
-    "Dmitri Zagidulin <dmitriz@digitalbazaar.com>"
+    "Dmitri Zagidulin <dmitriz@digitalbazaar.com>",
+    "Simon Petrac <spetrac@gmail.com>"
   ],
   "repository": {
     "type": "git",
@@ -23,12 +24,12 @@
   },
   "license": "BSD-3-Clause",
   "type": "module",
-  "main": "./lib/index.js",
-  "types": "./types/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "files": [
-    "lib/**/*.js",
-    "types/**/*.d.ts",
-    "types/**/*.d.ts.map"
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/**/*.d.ts.map"
   ],
   "dependencies": {
     "@digitalbazaar/credentials-context": "^3.1.0",
@@ -101,7 +102,7 @@
     "coverage": "cross-env NODE_ENV=test c8 npm run test-node",
     "coverage-ci": "cross-env NODE_ENV=test c8 --reporter=lcovonly --reporter=text-summary --reporter=text npm run test-node",
     "coverage-report": "c8 report",
-    "prepack": "npm run build-types",
-    "build-types": "rimraf types & tsc -p tsconfig.types.json"
+    "prepack": "npm run build",
+    "build": "rimraf dist & tsc -p tsconfig.json"
   }
 }
