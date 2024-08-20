@@ -1,15 +1,17 @@
 import { assertRecord, assertArray, toArray, isRecord } from './Util.js'
 import { type AnyURI, assertAnyURI, type DateTime, assertDateTime } from './XSD.js'
 import { type CredentialContext, type CredentialContextVersion, assertCredentialContext, extractCredentialContextVersion } from './CredentialContext.js'
-import { assertType, type Type } from './JSON-LD.js'
+import { assertType, assertTypedObject, type TypedObject } from './JSON-LD.js'
 import { assertCredentialSubject, type CredentialSubject } from './CredentialSubject.js'
 import { assertCredentialIssuer, type CredentialIssuer } from './CredentialIssuer.js'
 import { assertCredentialStatus, type CredentialStatus } from './CredentialStatus.js'
+import { assertCredentialEvidence, type CredentialEvidence } from './CredentialEvidence.js'
 
 export * from './CredentialContext.js'
 export * from './CredentialIssuer.js'
 export * from './CredentialSubject.js'
 export * from './CredentialStatus.js'
+export * from './CredentialEvidence.js'
 
 export type CredentialType = 'VerifiableCredential' | ['VerifiableCredential', ...string[]]
 
@@ -22,13 +24,14 @@ export function assertCredentialType(type: unknown, options?: { path?: string })
 
 export type Credential<version = 'any'> = version extends 'base' ? {
   '@context': CredentialContext,
-  id?: AnyURI,
   type: CredentialType,
+  id?: AnyURI,
   issuer: CredentialIssuer,
   credentialSubject: CredentialSubject,
-  credentialStatus?: CredentialStatus
-  // TODO evidence
-  // TODO mustHaveType
+  credentialStatus?: CredentialStatus,
+  evidence?: CredentialEvidence,
+  termsOfUse?: TypedObject,
+  proof?: TypedObject
 } : version extends 1.0 ? Credential<'base'> & {
   issuanceDate: DateTime,
   expirationDate?: DateTime
@@ -43,8 +46,8 @@ export function assertCredential(credential: unknown, options?: { path?: string,
   const _now = new Date(options?.now ?? Date.now())
   assertRecord(credential, { path: _path })
   assertCredentialContext(credential['@context'], { path: `${_path}.@context` })
-  if ('id' in credential) assertAnyURI(credential.id, { path: `${_path}.id` })
   assertCredentialType(credential.type, { path: `${_path}.type` })
+  if ('id' in credential) assertAnyURI(credential.id, { path: `${_path}.id` })
   assertCredentialIssuer(credential.issuer, { path: `${_path}.issuer`, allowRecord: true, allowArray: true })
   assertCredentialSubject(credential.credentialSubject, { path: `${_path}.credentialSubject`, allowMultiple: true })
   if ('credentialStatus' in credential) assertCredentialStatus(credential.credentialStatus, { path: `${_path}.credentialStatus`, allowMultiple: true })
@@ -58,8 +61,9 @@ export function assertCredential(credential: unknown, options?: { path?: string,
       if ('validUntil' in credential) assertCredentialValidDate(credential.validUntil, { path: `${_path}.validUntil`, min: _mode === 'verify' ? _now : undefined })
       break;
   }
-  // TODO evidence
-  // TODO mustHaveType
+  if ('evidence' in credential) assertCredentialEvidence(credential.evidence, { path: `${_path}.evidence`, allowMultiple: true })
+  if ('termsOfUse' in credential) assertTypedObject(credential.termsOfUse, { path: `${_path}.termsOfUse`, allowMultiple: true })
+  if ('proof' in credential) assertTypedObject(credential.proof, { path: `${_path}.proof`, allowMultiple: true })
 }
 
 export function assertCredentialValidDate(value: unknown, options?: { path?: string, min?: Date, max?: Date }): asserts value is DateTime {
