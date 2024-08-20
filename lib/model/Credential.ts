@@ -7,8 +7,9 @@ import { assertCredentialIssuer, type CredentialIssuer } from './CredentialIssue
 import { assertCredentialStatus, CredentialStatus } from './CredentialStatus.js'
 
 export * from './CredentialContext.js'
-export * from './CredentialSubject.js'
 export * from './CredentialIssuer.js'
+export * from './CredentialSubject.js'
+export * from './CredentialStatus.js'
 
 export type CredentialType = 'VerifiableCredential' | ['VerifiableCredential', ...string[]]
 
@@ -26,10 +27,12 @@ export type Credential<version = 'any'> = version extends 'base' ? {
   issuer: CredentialIssuer,
   credentialSubject: CredentialSubject,
   credentialStatus?: CredentialStatus
+  // TODO evidence
+  // TODO mustHaveType
 } : version extends 1.0 ? Credential<'base'> & {
-
+  // TODO v1 specifics
 } : version extends 2.0 ? Credential<'base'> & {
-
+  // TODO v2 specifics
 } : Credential<1.0> | Credential<2.0>
 
 export function assertCredential(credential: unknown, options?: { path?: string }): asserts credential is Credential {
@@ -41,8 +44,8 @@ export function assertCredential(credential: unknown, options?: { path?: string 
   assertCredentialIssuer(credential.issuer, { path: `${_path}.issuer`, allowRecord: true, allowArray: true })
   assertCredentialSubject(credential.credentialSubject, { path: `${_path}.credentialSubject`, allowMultiple: true })
   if ('credentialStatus' in credential) assertCredentialStatus(credential.credentialStatus, { path: `${_path}.credentialStatus`, allowMultiple: true })
-  // TODO all v1 specifics
-  // TODO all v2 specifics
+  // TODO v1 specifics
+  // TODO v2 specifics
   // TODO evidence
   // TODO mustHaveType
 }
