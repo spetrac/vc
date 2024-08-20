@@ -35,13 +35,14 @@ export type CredentialContext = [
   ...GenericContext[]
 ]
 
-export function assertCredentialContext(context: unknown, options?: { name?: string }): asserts context is CredentialContext {
+export function assertCredentialContext(context: unknown, options?: { path?: string }): asserts context is CredentialContext {
+  const _path = options?.path ?? 'context'
   if (!Array.isArray(context))
-    throw new Error(`${options?.name ?? 'context'} must be a string`)
+    throw new Error(`${_path} must be a string`)
   if (context.length === 0)
-    throw new Error(`${options?.name ?? 'context'} must not be empty`)
+    throw new Error(`${_path} must not be empty`)
   if (!isCredentialContextURI(context[0]))
-    throw new Error(`${options?.name ?? 'context'} must start with a credential context URI`)
+    throw new Error(`${_path} must start with a credential context URI`)
 }
 
 export function extractCredentialContextURI(context: CredentialContext): CredentialContextURI {
