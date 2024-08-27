@@ -1,3 +1,13 @@
+export function isObject(value: unknown): value is { [key: PropertyKey]: any } {
+  return value !== null && typeof value === 'object'
+}
+
+export function assertObject(value: unknown, options?: { path?: string }): asserts value is { [key: PropertyKey]: any } {
+  const _path = options?.path ?? 'value'
+  if (!isObject(value))
+    throw new TypeError(`${_path} must be an object`)
+}
+
 export function isRecord(value: unknown): value is Record<any, any> {
   return value !== null
     && typeof value === 'object'

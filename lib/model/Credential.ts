@@ -7,11 +7,11 @@ import { assertCredentialIssuer, type CredentialIssuer } from './CredentialIssue
 import { assertCredentialStatus, type CredentialStatus } from './CredentialStatus.js'
 import { assertCredentialEvidence, type CredentialEvidence } from './CredentialEvidence.js'
 
-export * from './CredentialContext.js'
-export * from './CredentialIssuer.js'
-export * from './CredentialSubject.js'
-export * from './CredentialStatus.js'
-export * from './CredentialEvidence.js'
+// export * from './CredentialContext.js'
+// export * from './CredentialIssuer.js'
+// export * from './CredentialSubject.js'
+// export * from './CredentialStatus.js'
+// export * from './CredentialEvidence.js'
 
 export type CredentialType = 'VerifiableCredential' | ['VerifiableCredential', ...string[]]
 
